@@ -463,11 +463,82 @@ function selectAlgo(el, algo) {
   // Show/hide algo-specific controls
   document.getElementById('weightSel').style.display = (algo === 'weighted_astar') ? 'block' : 'none';
   document.getElementById('beamWidthSel').style.display = (algo === 'beam') ? 'block' : 'none';
-  document.getElementById('depthLimitSel').style.display = (algo === 'dls') ? 'block' : 'none';
+  const depthLimitSel = document.getElementById('depthLimitSel');
+  depthLimitSel.style.display = (algo === 'dls') ? 'block' : 'none';
+  // reset to first built-in option when DLS is selected, hide custom input
+  if (algo === 'dls') {
+    depthLimitSel.value = '5';
+    const input = document.getElementById('depthLimitCustom');
+    if (input) {
+      input.style.display = 'none';
+      input.value = '';
+    }
+    clearDepthLimitError();
+  } else {
+    const input = document.getElementById('depthLimitCustom');
+    if (input) input.style.display = 'none';
+  }
+  // show a small hint to guide user how to use custom input
+  const depthHint = document.getElementById('depthLimitHint');
+  if (depthHint) depthHint.style.display = (algo === 'dls') ? 'block' : 'none';
 
   resetStats();
   consoleLog('system', `Algoritma dipilih: ${info.title}`);
   consoleLog('info', `Tipe: ${info.type} | ${info.desc.substring(0, 80)}...`);
+}
+
+// Handle depth limit dropdown change: swap dropdown ↔ custom input in same location
+function onDepthLimitChange(val) {
+  const sel = document.getElementById('depthLimitSel');
+  const input = document.getElementById('depthLimitCustom');
+  if (!sel || !input) return;
+  if (val === 'custom') {
+    // Show custom input, hide dropdown
+    sel.style.display = 'none';
+    input.style.display = 'block';
+    input.focus();
+  } else {
+    // Show dropdown, hide custom input
+    sel.style.display = 'block';
+    input.style.display = 'none';
+    input.value = '';
+    clearDepthLimitError();
+  }
+}
+
+// Read and validate selected depth limit. Returns positive integer, or null on invalid.
+function getSelectedDepthLimit() {
+  const sel = document.getElementById('depthLimitSel');
+  if (!sel) return null;
+  const val = sel.value;
+  if (val !== 'custom') {
+    const n = parseInt(val, 10);
+    if (!isFinite(n) || n <= 0) { showDepthLimitError('Pilihan depth tidak valid'); return null; }
+    clearDepthLimitError();
+    return n;
+  }
+  // custom path
+  const input = document.getElementById('depthLimitCustom');
+  if (!input) { showDepthLimitError('Input custom tidak tersedia'); return null; }
+  const raw = (input.value || '').toString().trim();
+  if (raw === '') { showDepthLimitError('Mohon masukkan angka Depth Limit'); return null; }
+  // allow only integers
+  if (!/^\d+$/.test(raw)) { showDepthLimitError('Hanya angka positif yang diperbolehkan'); return null; }
+  const n = parseInt(raw, 10);
+  if (!isFinite(n) || n <= 0) { showDepthLimitError('Depth Limit harus lebih besar dari 0'); return null; }
+  clearDepthLimitError();
+  return n;
+}
+
+function showDepthLimitError(msg) {
+  const el = document.getElementById('depthLimitError');
+  if (el) { el.textContent = msg; el.style.display = 'block'; }
+  consoleLog('error', msg);
+}
+
+function clearDepthLimitError() {
+  const el = document.getElementById('depthLimitError');
+  if (el) { el.textContent = ''; el.style.display = 'none'; }
 }
 
 // ===================== SIMULATION ENGINE =====================
@@ -491,6 +562,18 @@ function startSimulation() {
   consoleLog('system', `=== Memulai ${ALGO_INFO[currentAlgo].title} ===`);
   consoleLog('info', `Start: (${startPos.r},${startPos.c}) | Goal: (${goalPos.r},${goalPos.c})`);
   consoleLog('info', `Grid: ${gridRows}×${gridCols} | Heuristik: ${currentHeuristic}`);
+
+  // If Depth Limited Search selected, validate the chosen depth (built-in or custom)
+  if (currentAlgo === 'dls') {
+    const dl = getSelectedDepthLimit();
+    if (dl === null) {
+      // Validation failed and error message already shown by helper.
+      document.getElementById('infoStatus').textContent = 'Error';
+      document.getElementById('infoStatus').style.color = 'var(--danger)';
+      isRunning = false;
+      return;
+    }
+  }
 
   // Init algorithm-specific structures
   initAlgorithm();
@@ -521,7 +604,8 @@ function initAlgorithm() {
       break;
     case 'dls':
       algoState.stack = [{ r: s.r, c: s.c, depth: 0 }];
-      algoState.depthLimit = parseInt(document.getElementById('depthLimitSel').value) || 10;
+      // Use helper to obtain selected depth limit (supports custom input)
+      algoState.depthLimit = getSelectedDepthLimit() || 10;
       break;
     case 'ids':
       algoState.maxDepth = 0; algoState.currentDepth = 0;
@@ -1727,6 +1811,8 @@ function updateUIControls() {
   const weightSel     = document.getElementById('weightSel');
   const beamWidthSel  = document.getElementById('beamWidthSel');
   const depthLimitSel = document.getElementById('depthLimitSel');
+  const depthLimitCustom = document.getElementById('depthLimitCustom');
+  const depthLimitHint = document.getElementById('depthLimitHint');
   // Only target normal-mode grid size buttons (not compare ones)
   const gridSizeBtns = document.querySelectorAll('#rightNormal .grid-size-btn');
   const toolBtns     = document.querySelectorAll('#canvasWrapNormal .canvas-toolbar button');
@@ -1742,6 +1828,8 @@ function updateUIControls() {
     if (weightSel)     weightSel.disabled     = false;
     if (beamWidthSel)  beamWidthSel.disabled  = false;
     if (depthLimitSel) depthLimitSel.disabled = false;
+    if (depthLimitCustom) depthLimitCustom.disabled = false;
+    if (depthLimitHint) depthLimitHint.style.display = (depthLimitSel && depthLimitSel.style.display !== 'none') ? 'block' : 'none';
     gridSizeBtns.forEach(el => el.disabled = false);
     toolBtns.forEach(el => el.disabled = false);
   } else if (isPaused) {
@@ -1753,6 +1841,8 @@ function updateUIControls() {
     if (weightSel)     weightSel.disabled     = true;
     if (beamWidthSel)  beamWidthSel.disabled  = true;
     if (depthLimitSel) depthLimitSel.disabled = true;
+    if (depthLimitCustom) depthLimitCustom.disabled = true;
+    if (depthLimitHint) depthLimitHint.style.display = 'none';
     gridSizeBtns.forEach(el => el.disabled = true);
     toolBtns.forEach(el => el.disabled = true);
   } else {
@@ -1764,6 +1854,8 @@ function updateUIControls() {
     if (weightSel)     weightSel.disabled     = true;
     if (beamWidthSel)  beamWidthSel.disabled  = true;
     if (depthLimitSel) depthLimitSel.disabled = true;
+    if (depthLimitCustom) depthLimitCustom.disabled = true;
+    if (depthLimitHint) depthLimitHint.style.display = 'none';
     gridSizeBtns.forEach(el => el.disabled = true);
     toolBtns.forEach(el => el.disabled = true);
   }
@@ -2194,6 +2286,13 @@ function updateCmpStatus(side, status) {
 function startCompare() {
   if (!cmpStartPos || !cmpGoalPos) { consoleLog('error', 'Start/Goal belum ada di grid komparasi!'); return; }
   onCompareAlgoChange();
+  // If any selected algo in compare is DLS, validate depth limit first
+  if (cmpState.A && cmpState.B) {
+    if (cmpState.A.algo === 'dls' || cmpState.B.algo === 'dls') {
+      const dl = getSelectedDepthLimit();
+      if (dl === null) { document.getElementById('infoStatus').textContent = 'Error'; document.getElementById('infoStatus').style.color = 'var(--danger)'; return; }
+    }
+  }
   cmpFinishedCount = 0;
   cmpIsPaused = false;
   _cmpRafPending = false;
@@ -2972,7 +3071,8 @@ function _initCmpAlgo(algo, s, g) {
       as.stack.push({ r: s.r, c: s.c });
       break;
     case 'dls':
-      as.depthLimit = parseInt(document.getElementById('depthLimitSel').value) || 10;
+      // support custom depth input for compare mode as well
+      as.depthLimit = getSelectedDepthLimit() || 10;
       as.stack.push({ r: s.r, c: s.c, depth: 0 });
       break;
     case 'ids':

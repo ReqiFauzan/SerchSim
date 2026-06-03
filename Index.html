@@ -342,12 +342,19 @@
               <option value="5">Beam Width = 5</option>
               <option value="10">Beam Width = 10</option>
             </select>
-            <select class="select-styled" id="depthLimitSel" style="display:none">
-              <option value="5">Depth Limit = 5</option>
-              <option value="8">Depth Limit = 8</option>
-              <option value="10">Depth Limit = 10</option>
-              <option value="15">Depth Limit = 15</option>
-            </select>
+            <!-- Depth Limit container: swaps between dropdown and custom input -->
+            <div id="depthLimitContainer">
+              <select class="select-styled" id="depthLimitSel" style="display:none" onchange="onDepthLimitChange(this.value)">
+                <option value="5">Depth Limit = 5</option>
+                <option value="8">Depth Limit = 8</option>
+                <option value="10">Depth Limit = 10</option>
+                <option value="15">Depth Limit = 15</option>
+                <option value="custom">Input Custom</option>
+              </select>
+              <input id="depthLimitCustom" type="number" min="1" step="1" placeholder="Masukkan Depth Limit (positif)" style="display:none;width:100%;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit;font-size:13px;box-sizing:border-box" />
+              <div id="depthLimitError" style="color:var(--danger);font-size:12px;margin-top:6px;display:none"></div>
+            </div>
+            <div id="depthLimitHint" style="display:none;margin-top:6px;font-size:12px;color:var(--text3)">Pilih <strong>Input Custom</strong> pada dropdown jika ingin memasukkan nilai Depth Limit sendiri.</div>
           </div>
           <div class="panel-section" style="flex:1;overflow-y:auto;padding-bottom:6px;">
             <div class="panel-title">Informasi Langkah</div>
